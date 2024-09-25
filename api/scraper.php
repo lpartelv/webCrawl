@@ -1,30 +1,38 @@
 <?php
-class WebScraper {
-    public function scrape($url) {
-        // cURL kasutamine lehe sisu toomiseks
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $html = curl_exec($ch);
-        curl_close($ch);
+// Autoload dependencies via Composer
+require '../vendor/autoload.php';
 
-        if (!$html) {
-            return ['error' => 'Failed to retrieve content'];
-        }
+use GuzzleHttp\Client;
+use voku\helper\HtmlDomParser;
 
-        // Lehe sisu analüüs
-        $dom = new DOMDocument();
-        @$dom->loadHTML($html);
-        $xpath = new DOMXPath($dom);
+// Initialize Guzzle HTTP client
+$client = new Client([
+    'base_uri' => 'https://www.klick.ee',
+    'timeout'  => 5.0,
+]);
 
-        // Näide kategooriate kogumisest
-        $categories = [];
-        foreach ($xpath->query("//div[contains(@class, 'category')]") as $category) {
-            $categories[] = trim($category->nodeValue);
-        }
+try {
+    // Send GET request to the webpage
+    $response = $client->request('GET', '/telefonid-ja-lisad/mobiiltelefonid/nutitelefonid');
+    $htmlContent = $response->getBody()->getContents();
+    
+    // Parse HTML content
+    $dom = HtmlDomParser::str_get_html($htmlContent);
 
-        return [
-            'categories' => array_count_values($categories)
-        ];
+    // Find product elements in HTML
+    $products = $dom->find('.product-listing'); // Example CSS class
+
+
+    foreach ($products as $product) {
+        $title = $product->find('.product-name')->innertext;
+        //$price = $product->find('.product-price', 0)->innertext;
+        
+        //echo "Title: " . $title . "\n";
+        print_r($title);
+       // echo "Price: " . $price . "\n";
     }
+
+} catch (\Exception $e) {
+    echo "Error: " . $e->getMessage();
 }
+?>
