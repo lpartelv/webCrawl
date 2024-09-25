@@ -1,38 +1,34 @@
 <?php
-// Autoload dependencies via Composer
-require '../vendor/autoload.php';
+class WebScraper {
+    public function scrape($url) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $html = curl_exec($ch);
+        curl_close($ch);
 
-use GuzzleHttp\Client;
-use voku\helper\HtmlDomParser;
+        if (!$html) {
+            return ['error' => 'Failed to retrieve content'];
+        }
 
-// Initialize Guzzle HTTP client
-$client = new Client([
-    'base_uri' => 'https://www.klick.ee',
-    'timeout'  => 5.0,
-]);
+        $dom = new DOMDocument();
+        @$dom->loadHTML($html);
+        $xpath = new DOMXPath($dom);
 
-try {
-    // Send GET request to the webpage
-    $response = $client->request('GET', '/telefonid-ja-lisad/mobiiltelefonid/nutitelefonid');
-    $htmlContent = $response->getBody()->getContents();
-    
-    // Parse HTML content
-    $dom = HtmlDomParser::str_get_html($htmlContent);
+        $categories = [];
+        $products = $xpath->query("//div[contains(@class, 'product-listing')]/div/div");
+        foreach ($products as $product) {
+            $nameNode = $xpath->query(".//p[contains(@class, 'product-name')]", $product);
+            $name = $nameNode->length > 0 ? trim($nameNode->item(0)->nodeValue) : 'No name available';
 
-    // Find product elements in HTML
-    $products = $dom->find('.product-listing'); // Example CSS class
+            $priceNode = $xpath->query(".//span[contains(@class, 'price')]", $product);
+            $price = $priceNode->length > 0 ? trim($priceNode->item(0)->nodeValue) : 'No price available';
 
+            $discountPriceNode = $xpath->query(".//span[contains(@class, 'price-discount')]", $product);
+            $discountPrice = $discountPriceNode->length > 0 ? trim($discountPriceNode->item(0)->nodeValue) : 'No discount available';
 
-    foreach ($products as $product) {
-        $title = $product->find('.product-name')->innertext;
-        //$price = $product->find('.product-price', 0)->innertext;
-        
-        //echo "Title: " . $title . "\n";
-        print_r($title);
-       // echo "Price: " . $price . "\n";
+            $categories[] = [$name, $price, $discountPrice];
+        }
+        return $categories;
     }
-
-} catch (\Exception $e) {
-    echo "Error: " . $e->getMessage();
 }
-?>
